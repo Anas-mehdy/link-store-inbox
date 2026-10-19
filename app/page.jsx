@@ -1,0 +1,1 @@
+export default function Home(){return <main style={{fontFamily:'system-ui',maxWidth:650,margin:'12vh auto',padding:24}}><h1>Link Store Inbox</h1><p>TikTok integration preparation. No TikTok account is connected yet.</p><p>OAuth callback endpoint: <code>/api/tiktok/callback</code></p></main>;}
