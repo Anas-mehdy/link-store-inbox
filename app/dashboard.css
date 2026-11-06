@@ -11,3 +11,8 @@
 .access-card>button{margin-inline-end:8px}
 .access-card [role=alert],.inbox-error{color:#a32929}
 .inbox-error{margin:8px 0}
+
+.tiktok-controls{margin-top:16px}
+.tiktok-controls form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
+.tiktok-controls label{display:grid;gap:6px;flex:1;min-width:min(100%,240px)}
+.tiktok-controls input{width:100%;padding:9px;border:1px solid #c4cfdf;border-radius:8px}
