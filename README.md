@@ -12,8 +12,9 @@ Active team members can read the inbox, change conversation status and save inte
 
 ## TikTok comments
 
-Apply both migrations in order. The TikTok integration also requires the server-only
-`INBOX_SUPABASE_SERVICE_ROLE_KEY` from the same project and these server-side variables:
+Apply the migrations in order. The TikTok integration also requires the server-only
+`INBOX_TIKTOK_DB_TOKEN`, a random 32-byte hex string whose SHA-256 digest is stored in
+`link_inbox_private.tiktok_backend_key`, and these server-side variables:
 
 - `TIKTOK_CLIENT_ID` and `TIKTOK_CLIENT_SECRET` from Link Store Analytics in TikTok API for Business.
 - `TIKTOK_AUTHORIZATION_URL` from the app's TikTok account holder authorization settings.

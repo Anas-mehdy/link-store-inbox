@@ -1,15 +1,16 @@
 import { randomBytes, createHmac } from "node:crypto";
-import { failure, IntegrationError, json, requireManager, setup, stateCookie } from "../server";
+import { failure, IntegrationError, json, managerToken, requireManager, sealManagerToken, setup, stateCookie } from "../server";
 
 export async function POST(request) {
   try {
-    const userId = await requireManager(request);
+    const accessToken = managerToken(request);
+    const userId = await requireManager(accessToken);
     const { authorization, callback, secret } = setup();
     if (new URL(request.url).origin !== callback.origin) {
       throw new IntegrationError("افتح الداشبورد من الرابط المسجّل للتفويض.", 409);
     }
     const state = randomBytes(32).toString("hex");
-    const value = `${state}.${userId}.${Date.now() + 600_000}`;
+    const value = `${state}.${userId}.${Date.now() + 600_000}.${sealManagerToken(accessToken, state)}`;
     const signature = createHmac("sha256", secret).update(value).digest("hex");
     authorization.searchParams.set("scope", "comment.list");
     authorization.searchParams.set("redirect_uri", callback.href);

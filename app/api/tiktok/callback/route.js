@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { IntegrationError, privateHeaders, requireMembership, saveConnection, setup, stateCookie, tiktok } from "../server";
+import { IntegrationError, openManagerToken, privateHeaders, requireManager, saveConnection, setup, stateCookie, tiktok } from "../server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,19 +13,21 @@ export async function GET(request) {
 
   let outcome = "error";
   try {
-    const config = setup();
+    const { secret, callback } = setup();
     const cookie = request.cookies.get(stateCookie)?.value ?? "";
-    const [state, userId, expiry, signature] = cookie.split(".");
-    const expected = createHmac("sha256", config.secret).update(`${state}.${userId}.${expiry}`).digest();
+    const [state, userId, expiry, sealed, signature] = cookie.split(".");
+    const expected = createHmac("sha256", secret).update(`${state}.${userId}.${expiry}.${sealed}`).digest();
     const provided = Buffer.from(signature ?? "", "hex");
-    if (url.origin !== config.callback.origin || !state || state !== query.get("state")
+    if (url.origin !== callback.origin || !state || state !== query.get("state")
       || !(Number(expiry) > Date.now()) || provided.length !== expected.length
       || !timingSafeEqual(provided, expected)) {
       throw new IntegrationError("انتهت جلسة التفويض أو كانت غير صالحة.");
     }
     const code = query.get("auth_code") ?? query.get("code");
     if (query.has("error") || !code) throw new IntegrationError("لم يكتمل تفويض تيك توك.");
-    await requireMembership(config.db, userId);
+    const accessToken = openManagerToken(sealed, state);
+    if (await requireManager(accessToken) !== userId) throw new IntegrationError("جلسة التفويض غير صالحة.");
+    const config = setup(accessToken);
     const tokens = await tiktok("tt_user/oauth2/token", { body: {
       client_id: config.clientId, client_secret: config.secret, grant_type: "authorization_code",
       auth_code: code, redirect_uri: config.callback.href,

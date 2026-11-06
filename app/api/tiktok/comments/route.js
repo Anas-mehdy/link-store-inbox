@@ -1,15 +1,16 @@
-import { account, failure, getConnection, IntegrationError, json, requireManager, setup, tiktok } from "../server";
+import { databaseAction, failure, getConnection, IntegrationError, json, managerToken, requireManager, setup, tiktok } from "../server";
 
 export async function POST(request) {
   try {
-    await requireManager(request);
+    const accessToken = managerToken(request);
+    await requireManager(accessToken);
     const input = await request.json().catch(() => null);
     const video = videoId(input?.video);
     const cursor = String(input?.cursor ?? 0);
     if (!video || !/^\d{1,16}$/.test(cursor)) {
       throw new IntegrationError("حط رابط فيديو كامل من حساب ‎@link.60.", 400);
     }
-    const config = setup();
+    const config = setup(accessToken);
     const connection = await getConnection(config);
     const result = await tiktok("business/comment/list", {
       token: connection.access_token,
@@ -32,7 +33,7 @@ export async function POST(request) {
       if (typeof id !== "string" || !/^\d+$/.test(id) || !Number.isFinite(time) || time <= 0
         || time > 253402300799) throw new IntegrationError("وصل تعليق بصيغة غير متوقعة.");
       rows.set(id, {
-        tiktok_comment_id: id, tiktok_video_id: video, type: "comment",
+        comment_id: id, video_id: video,
         name: comment.display_name || comment.username || "مستخدم تيك توك",
         handle: comment.username || "",
         body: comment.text || (comment.image_url ? "تعليق بصورة" : ""),
@@ -41,9 +42,7 @@ export async function POST(request) {
       });
     }
     if (rows.size) {
-      await config.db.from("link_inbox_conversations").upsert([...rows.values()], {
-        onConflict: "tiktok_comment_id", ignoreDuplicates: true,
-      }).throwOnError();
+      await databaseAction(config, "import_comments", [...rows.values()]);
     }
     return json({ count: rows.size, nextCursor });
   } catch (error) {
