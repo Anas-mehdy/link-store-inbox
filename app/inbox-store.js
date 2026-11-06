@@ -1,5 +1,5 @@
 const conversationFields = `
-  id, type, name, handle, body, source, status, assigned_to, priority, received_at,
+  id, type, name, handle, body, source, status, assigned_to, priority, received_at, tiktok_video_id,
   drafts:link_inbox_drafts(id, body, author_id, created_at)
 `;
 const dateFormat = new Intl.DateTimeFormat("ar-SA", {
