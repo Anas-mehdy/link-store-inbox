@@ -13,7 +13,8 @@ export default function TikTokSettings({ team, onImported }) {
   useEffect(() => {
     const url = new URL(window.location.href);
     const outcome = url.searchParams.get("tiktok");
-    if (outcome === "connected") setStatus("تم تفويض الحساب. فيك هلق تستورد التعليقات من رابط فيديو.");
+    if (outcome === "connected") setStatus("تم تفويض الحساب لقراءة التعليقات ونشر الردود.");
+    if (outcome === "read-only") setError("تيك توك منحنا صلاحية القراءة فقط. نشر الردود لسه غير مفعّل.");
     if (outcome === "error") setError("تفويض تيك توك ما اكتمل. افتح صفحة الربط وجرّب من جديد.");
     if (outcome === "wrong-account") setError("الحساب اللي فوّضته مختلف عن الحساب المرتبط.");
     if (outcome) {

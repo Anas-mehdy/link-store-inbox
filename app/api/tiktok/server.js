@@ -152,6 +152,7 @@ export async function saveConnection(config, data) {
     ...tokenFields(data), business_id: data.open_id,
   });
   if (!saved) throw new IntegrationError("هذا التفويض يعود لحساب تيك توك مختلف.", 409);
+  return saved.can_reply === true;
 }
 
 export async function getConnection(config) {

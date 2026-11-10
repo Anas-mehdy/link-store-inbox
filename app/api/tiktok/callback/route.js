@@ -32,8 +32,8 @@ export async function GET(request) {
       client_id: config.clientId, client_secret: config.secret, grant_type: "authorization_code",
       auth_code: code, redirect_uri: config.callback.href,
     } });
-    await saveConnection(config, tokens);
-    outcome = "connected";
+    const canReply = await saveConnection(config, tokens);
+    outcome = canReply ? "connected" : "read-only";
   } catch (error) {
     if (error instanceof IntegrationError && error.status === 409) outcome = "wrong-account";
   }
