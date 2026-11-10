@@ -1,6 +1,6 @@
 const conversationFields = `
-  id, type, name, handle, body, source, status, assigned_to, priority, received_at, tiktok_video_id,
-  drafts:link_inbox_drafts(id, body, author_id, created_at)
+  id, type, name, handle, body, source, status, assigned_to, priority, received_at, tiktok_video_id, tiktok_comment_id,
+  drafts:link_inbox_drafts(id, body, author_id, created_at, tiktok_delivery)
 `;
 const dateFormat = new Intl.DateTimeFormat("ar-SA", {
   calendar: "gregory", dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh",
@@ -31,6 +31,7 @@ export async function loadInbox(client, userId) {
         id: draft.id,
         by: members.find(person => person.user_id === draft.author_id)?.display_name ?? "عضو سابق",
         text: draft.body,
+        delivery: draft.tiktok_delivery,
       })),
     })),
   };
@@ -46,4 +47,17 @@ export async function saveDraft(client, { id, conversationId, text }) {
     { id, conversation_id: conversationId, body: text },
     { onConflict: "id", ignoreDuplicates: true },
   ).throwOnError();
+}
+
+export async function publishTikTokReply(client, { conversationId, body }) {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) throw new Error("سجّل الدخول أولًا.");
+  const response = await fetch("/api/tiktok/reply", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, body }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
 }

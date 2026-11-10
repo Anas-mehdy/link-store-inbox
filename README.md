@@ -8,7 +8,7 @@ With Node.js 22 or later, run `npm ci` and `npm run dev`. With no inbox environm
 2. Set `INBOX_SUPABASE_URL` and `INBOX_SUPABASE_PUBLISHABLE_KEY` in `.env.local` or the deployment environment. Use a publishable key beginning with `sb_publishable_`.
 3. Create each teammate's account in Supabase Auth and add a row to `public.link_inbox_members` using the account UUID, display name and either `manager` or `agent`. Set `active` to false to remove inbox access.
 
-Active team members can read the inbox, change conversation status and save internal drafts. Managers can also assign conversations. Team mode starts empty and shows up to the 100 newest conversations once data is present. TikTok ingestion and reply delivery are separate integration steps.
+Active team members can read the inbox, change conversation status and save internal drafts. Managers can also assign conversations. Team mode starts empty and shows up to the 100 newest conversations once data is present. TikTok comments can be imported manually from an owned video.
 
 ## TikTok comments
 
@@ -26,4 +26,4 @@ Sign in as an inbox manager, open Settings, and authorize with the TikTok accoun
 `@link.60`. Paste the full URL of one of its videos to import public top-level customer
 comments. Follow the next-page button when available. Reimporting a page preserves
 existing conversation state and drafts. The inbox shows its newest 100 conversations.
-The integration reads comments and saves internal drafts.
+Managers can publish one public reply per imported comment after granting comment management in TikTok. Internal drafts remain separate. An unconfirmed send is held for verification to prevent duplicate replies.

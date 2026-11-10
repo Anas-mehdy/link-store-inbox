@@ -12,7 +12,7 @@ export async function POST(request) {
     const state = randomBytes(32).toString("hex");
     const value = `${state}.${userId}.${Date.now() + 600_000}.${sealManagerToken(accessToken, state)}`;
     const signature = createHmac("sha256", secret).update(value).digest("hex");
-    authorization.searchParams.set("scope", "comment.list");
+    authorization.searchParams.set("scope", "comment.list,comment.list.manage");
     authorization.searchParams.set("redirect_uri", callback.href);
     authorization.searchParams.set("state", state);
     const response = json({ url: authorization.href });

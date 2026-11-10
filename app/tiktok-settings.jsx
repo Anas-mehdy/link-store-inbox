@@ -57,7 +57,7 @@ export default function TikTokSettings({ team, onImported }) {
   return (
     <div className="placeholderCard tiktok-controls">
       <h2>تعليقات ‎@link.60</h2>
-      <p>فوّض حساب تيك توك، ثم استورد التعليقات العامة باستخدام رابط فيديو كامل.</p>
+      <p>للاستيراد، استخدم رابط فيديو كامل. لنشر الردود، أعد ربط الحساب ووافق على إدارة التعليقات.</p>
       <button className="signout" disabled={busy} onClick={() => run("connect", {})}>ربط حساب تيك توك</button>
       <form onSubmit={event => { event.preventDefault(); run("comments", { video, cursor }); }}>
         <label>رابط الفيديو

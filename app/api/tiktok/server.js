@@ -17,6 +17,8 @@ export class IntegrationError extends Error {
   }
 }
 
+export class TikTokRequestRejection extends IntegrationError {}
+
 export function json(body, status = 200) {
   return NextResponse.json(body, { status, headers: privateHeaders });
 }
@@ -118,7 +120,10 @@ export async function tiktok(path, { query, body, token } = {}) {
   const result = await response.json();
   if (!response.ok || result.code !== 0 || !result.data) {
     const code = Number.isSafeInteger(result.code) ? ` (رمز ${result.code})` : "";
-    throw new IntegrationError(`تيك توك رفض الطلب${code}. تحقّق من تفويض الحساب والصلاحية.`);
+    const rejected = (response.status >= 400 && response.status < 500)
+      || (response.ok && result.code >= 40000 && result.code < 50000);
+    const ErrorType = rejected ? TikTokRequestRejection : IntegrationError;
+    throw new ErrorType(`تيك توك رفض الطلب${code}. تحقّق من تفويض الحساب والصلاحية.`);
   }
   return result.data;
 }
@@ -132,6 +137,9 @@ function tokenFields(data) {
     access_token: data.access_token,
     expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     ...(data.refresh_token && { refresh_token: data.refresh_token }),
+    ...(typeof data.scope === "string" && {
+      can_reply: data.scope.split(/[, ]+/).includes("comment.list.manage"),
+    }),
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import { saveConversation, saveDraft } from "./inbox-store";
+import { loadInbox, publishTikTokReply, saveConversation, saveDraft } from "./inbox-store";
 import TikTokSettings from "./tiktok-settings";
 
 const initial=[
@@ -32,6 +32,8 @@ export default function Inbox({ team }){
  const pending=items.filter(x=>x.status==="new").length;
  const [saving,setSaving]=useState(false),[error,setError]=useState(""),[draftId,setDraftId]=useState(null);
  const canAssign = !team || team.member.role === "manager";
+ const canPublish = team?.member.role === "manager" && current?.tiktok_comment_id;
+ const hasTikTokReply = current?.replies.some(entry => entry.delivery && entry.delivery !== "draft");
  const unassigned = team ? "" : "غير مسند";
  const assignees = team
    ? team.members.map(member => [member.user_id, member.display_name])
@@ -92,6 +94,33 @@ export default function Inbox({ team }){
      changeDraft("");
    });
  }
+ async function publish() {
+   const body = draft.trim();
+   if (!canPublish || hasTikTokReply || !body || saving) return;
+   if (!window.confirm("تنشر هالرد علنًا على تيك توك؟")) return;
+
+   const conversationId = current.id;
+   setSaving(true);
+   setError("");
+   try {
+     const { id } = await publishTikTokReply(team.client, { conversationId, body });
+     updateItem(conversationId, item => ({
+       ...item,
+       replies: [...item.replies, { id, by: team.member.display_name, text: body, delivery: "published" }],
+     }));
+     changeDraft("");
+   } catch (problem) {
+     setError(problem.message || "ما قدرنا نأكد النشر. تحقّق من تيك توك قبل إعادة الإرسال.");
+     const fresh = await loadInbox(team.client, team.member.user_id).catch(() => null);
+     const updated = fresh?.items?.find(item => item.id === conversationId);
+     if (updated) updateItem(conversationId, () => updated);
+   } finally {
+     setSaving(false);
+   }
+ }
+
+ const deliveryLabels = { draft: "مسودة داخلية", published: "نُشر على تيك توك",
+   pending: "بانتظار تأكيد النشر", unknown: "النشر غير مؤكّد" };
  const labels={all:"الكل",comment:"التعليقات",dm:"الرسائل",new:"جديد",open:"قيد المعالجة",done:"مغلق"};
  return <div className="shell" dir="rtl">
  <aside className={"sidebar "+(mobileMenu?"expanded":"")}>
@@ -109,7 +138,7 @@ export default function Inbox({ team }){
  {error && <p className="inbox-error" role="alert">{error}</p>}
  <div className="workspace"><div className="listing"><div className="listhead"><h2>المحادثات <span>{list.length}</span></h2><div className="switches">{[["all","الكل"],["comment","التعليقات"],["dm","الرسائل"]].map(([v,l])=><button key={v} className={tab===v?"on":""} onClick={()=>setTab(v)}>{l}</button>)}</div><div className="searchbar"><Icon name="search" size={17}/><input aria-label="بحث في المحادثات" value={query} onChange={e=>setQuery(e.target.value)} placeholder="ابحث عن عميل أو تعليق..."/></div><div className="filterrow"><Icon name="filter" size={15}/><select aria-label="تصفية الحالة" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">جميع الحالات</option><option value="new">جديد</option><option value="open">قيد المعالجة</option><option value="done">مغلق</option></select></div></div>
  <div className="entries">{list.length?list.map(x=><button key={x.id} className={"entry "+(active===x.id?"active":"")} disabled={saving} onClick={()=>{setActive(x.id);changeDraft("");setError("")}}><div className="avatar">{x.avatar}</div><div className="entrydetails"><div className="entrytop"><strong>{x.name}</strong><small>{x.time}</small></div><div className="entrytext">{x.body}</div><div className="entrybottom"><span className={"type "+x.type}>{x.type==="comment"?"تعليق":"رسالة"}</span><span className={"status "+x.status}>{labels[x.status]}</span></div></div></button>):<div className="empty">لا توجد نتائج مطابقة</div>}</div></div>
- <div className="conversation">{current?<><div className="convhead"><div className="person"><div className="avatar large">{current.avatar}</div><div><h2>{current.name}</h2><span>@{current.handle}</span></div></div><span className={"status "+current.status}>{labels[current.status]}</span></div><div className="context"><span>{current.type==="comment"?"تعليق على منشور":"رسالة خاصة"}</span><b>{current.tiktok_video_id ? <a href={`https://www.tiktok.com/@link.60/video/${current.tiktok_video_id}`} target="_blank" rel="noreferrer">{current.source}</a> : current.source}</b><small>{current.time}</small></div><div className="thread"><div className="bubble customer"><span>{current.name}</span><p>{current.body}</p></div>{current.replies.map((r,i)=><div className="bubble agent" key={r.id ?? i}><span>{r.by}</span><p>{r.text}</p></div>)}<div className="threadhint"><Icon name="shield" size={14}/> {team ? "المسودات داخلية وغير منشورة على تيك توك" : "الردود هنا محلية وتجريبية ولا تُرسل إلى TikTok"}</div></div><form onSubmit={reply} className="composer"><textarea aria-label={team ? "اكتب مسودة الرد" : "اكتب الرد التجريبي"} placeholder="اكتب ردك على العميل..." value={draft} onChange={e=>changeDraft(e.target.value)} rows="3" maxLength={team ? 4000 : undefined} disabled={saving}/><div className="composebar"><span>{team ? "حفظ داخلي للفريق" : "وضع تجريبي • لا يتم إرسال أي رسالة"}</span><button type="submit" disabled={saving || !draft.trim()}><Icon name="send" size={17}/> {team ? "حفظ المسودة" : "حفظ رد تجريبي"}</button></div></form></>:<div className="empty">اختر محادثة لعرض تفاصيلها</div>}</div>
+ <div className="conversation">{current?<><div className="convhead"><div className="person"><div className="avatar large">{current.avatar}</div><div><h2>{current.name}</h2><span>@{current.handle}</span></div></div><span className={"status "+current.status}>{labels[current.status]}</span></div><div className="context"><span>{current.type==="comment"?"تعليق على منشور":"رسالة خاصة"}</span><b>{current.tiktok_video_id ? <a href={`https://www.tiktok.com/@link.60/video/${current.tiktok_video_id}`} target="_blank" rel="noreferrer">{current.source}</a> : current.source}</b><small>{current.time}</small></div><div className="thread"><div className="bubble customer"><span>{current.name}</span><p>{current.body}</p></div>{current.replies.map((r,i)=><div className="bubble agent" key={r.id ?? i}><span>{r.by}{r.delivery && ` · ${deliveryLabels[r.delivery]}`}</span><p>{r.text}</p></div>)}<div className="threadhint"><Icon name="shield" size={14}/> {team ? "المسودات داخلية وغير منشورة على تيك توك" : "الردود هنا محلية وتجريبية ولا تُرسل إلى TikTok"}</div></div><form onSubmit={reply} className="composer"><textarea aria-label={team ? "اكتب مسودة الرد" : "اكتب الرد التجريبي"} placeholder="اكتب ردك على العميل..." value={draft} onChange={e=>changeDraft(e.target.value)} rows="3" maxLength={team ? 4000 : undefined} disabled={saving}/><div className="composebar"><span>{team ? "حفظ داخلي للفريق" : "وضع تجريبي • لا يتم إرسال أي رسالة"}</span><button type="submit" disabled={saving || !draft.trim()}><Icon name="send" size={17}/> {team ? "حفظ المسودة" : "حفظ رد تجريبي"}</button>{canPublish && !hasTikTokReply && <button type="button" disabled={saving || !draft.trim()} onClick={publish}>نشر الرد على تيك توك</button>}</div></form></>:<div className="empty">اختر محادثة لعرض تفاصيلها</div>}</div>
  <div className="details"><h2>تفاصيل المحادثة</h2>{current&&<><div className="detailavatar">{current.avatar}</div><h3>{current.name}</h3><p className="handle">@{current.handle}</p><div className="detailrow"><span>النوع</span><b>{current.type==="comment"?"تعليقات المنشورات":"الرسائل الخاصة"}</b></div><div className="detailrow"><span>المسؤول</span><select aria-label="المسؤول" value={current.assigned} disabled={saving || !canAssign} onChange={e=>mutate({assigned:e.target.value}, {assigned_to:e.target.value || null})}><option value={unassigned}>غير مسند</option>{current.assigned !== unassigned && !assignees.some(([id])=>id===current.assigned) && <option value={current.assigned} disabled>عضو سابق</option>}{assignees.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></div><div className="detailrow"><span>الحالة</span><select aria-label="حالة المحادثة" value={current.status} disabled={saving} onChange={e=>mutate({status:e.target.value}, {status:e.target.value})}><option value="new">جديد</option><option value="open">قيد المعالجة</option><option value="done">مغلق</option></select></div><div className="detailrow"><span>الأولوية</span><b>{current.priority==="high"?"مرتفعة":"عادية"}</b></div><div className="detailnote">{team ? "تُحفظ الحالة والمسؤول والمسودات في صندوق الوارد." : "التعديلات مؤقتة داخل هذه الصفحة. لن تُحفظ في قاعدة بيانات ولن تؤثر على حساب TikTok."}</div></>}</div></div></section>:
  <section className="body secondary"><div className="heading"><div><h1>{view==="analytics"?"إحصائيات خدمة العملاء":view==="team"?"إدارة الموظفين":"إعدادات التكامل"}</h1><p>{team ? "مساحة عمل فريق خدمة العملاء" : "معاينة أولية — غير متصلة ببيانات فعلية"}</p></div></div>{view==="analytics"?<div className="placeholderCard"><Icon name="chart" size={32}/><h2>تقارير أولية</h2><p>عدد الحالات المعروضة: {items.length} • مغلقة: {items.filter(x=>x.status==="done").length}</p><p>ستظهر تقارير وقت الرد وأداء الموظفين بعد تفعيل حفظ البيانات.</p></div>:view==="team"?<div className="placeholderCard"><Icon name="users" size={32}/><h2>حسابات الفريق</h2>{team ? <ul>{team.members.map(person=><li key={person.user_id}>{person.display_name} · {person.role === "manager" ? "مدير" : "موظف"}</li>)}</ul> : <p>تظهر حسابات الفريق بعد إعداد تسجيل الدخول.</p>}</div>:<div className="placeholderCard"><Icon name="settings" size={32}/><h2>حالة التكامل</h2><p>التعليقات العامة متاحة للاستيراد بعد تفويض الحساب.</p><p>Business Messaging API: تم تقديم الطلب، وحالة الموافقة غير مؤكدة.</p></div>}{view === "settings" && team?.member.role === "manager" && <TikTokSettings team={team} onImported={receiveImported} />}</section>}
  </main></div>;
