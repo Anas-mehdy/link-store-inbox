@@ -9,6 +9,30 @@ export default function TikTokSettings({ team, onImported }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [automatic, setAutomatic] = useState("checking");
+  const client = team.client;
+
+  useEffect(() => {
+    let disposed = false;
+    webhookSettings(client).then(
+      data => { if (!disposed) setAutomatic(data.status); },
+      () => { if (!disposed) setAutomatic("unavailable"); },
+    );
+    return () => { disposed = true; };
+  }, [client]);
+
+  async function activate() {
+    setBusy(true);
+    setError("");
+    try {
+      const data = await webhookSettings(client, "POST");
+      setAutomatic(data.status);
+    } catch (problem) {
+      setError(problem.message || "تعذّر تفعيل المزامنة.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -58,18 +82,48 @@ export default function TikTokSettings({ team, onImported }) {
   return (
     <div className="placeholderCard tiktok-controls">
       <h2>تعليقات ‎@link.60</h2>
-      <p>للاستيراد، استخدم رابط فيديو كامل. لنشر الردود، أعد ربط الحساب ووافق على إدارة التعليقات.</p>
-      <button className="signout" disabled={busy} onClick={() => run("connect", {})}>ربط حساب تيك توك</button>
-      <form onSubmit={event => { event.preventDefault(); run("comments", { video, cursor }); }}>
-        <label>رابط الفيديو
-          <input type="url" dir="ltr" required value={video} disabled={busy}
-            placeholder="https://www.tiktok.com/@link.60/video/…"
-            onChange={event => { setVideo(event.target.value); setCursor(null); setStatus(""); }} />
-        </label>
-        <button className="signout" disabled={busy}>{cursor ? "استيراد الصفحة التالية" : "استيراد التعليقات"}</button>
-      </form>
+      <div className="webhook-status">
+        <strong>المزامنة التلقائية</strong>
+        <p role="status">{{
+          checking: "جارٍ التحقق من اشتراك تيك توك…",
+          active: "مفعّلة لكل الفيديوهات العامة. التعليقات الجديدة تظهر في صندوق الوارد.",
+          inactive: "جاهزة للتفعيل لكل الفيديوهات العامة.",
+          conflict: "في اشتراك تعليقات بإعداد مختلف على تطبيق تيك توك.",
+          unavailable: "تعذّر التحقق من اشتراك تيك توك.",
+        }[automatic]}</p>
+        {["inactive", "unavailable"].includes(automatic) &&
+          <button className="signout" disabled={busy} onClick={activate}>تفعيل المزامنة</button>}
+      </div>
+      <div className="tiktok-settings-actions">
+        <button className="signout" disabled={busy} onClick={() => run("connect", {})}>ربط حساب تيك توك</button>
+        <details>
+          <summary>استيراد تعليقات سابقة من رابط</summary>
+          <form onSubmit={event => { event.preventDefault(); run("comments", { video, cursor }); }}>
+            <label>رابط الفيديو
+              <input type="url" dir="ltr" required value={video} disabled={busy}
+                placeholder="https://www.tiktok.com/@link.60/video/…"
+                onChange={event => { setVideo(event.target.value); setCursor(null); setStatus(""); }} />
+            </label>
+            <button className="signout" disabled={busy}>{cursor ? "استيراد الصفحة التالية" : "استيراد التعليقات"}</button>
+          </form>
+        </details>
+      </div>
       {error && <p className="inbox-error" role="alert">{error}</p>}
       {status && <p role="status">{status}</p>}
     </div>
   );
+}
+
+
+async function webhookSettings(client, method = "GET") {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) throw new Error("سجّل الدخول أولًا.");
+  const response = await fetch("/api/tiktok/webhook/setup", {
+    method,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    cache: "no-store",
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
 }

@@ -16,3 +16,15 @@
 .tiktok-controls form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
 .tiktok-controls label{display:grid;gap:6px;flex:1;min-width:min(100%,240px)}
 .tiktok-controls input{width:100%;padding:9px;border:1px solid #c4cfdf;border-radius:8px}
+
+.video-filter{display:grid;gap:7px;margin-top:15px;font-size:12px;color:#667387}
+.video-filter select{min-width:0;width:100%;padding:8px;border:1px solid #e5eaf0;border-radius:8px;background:#fff;color:#354259}
+.video-filter a{color:#12857b;text-decoration:none;justify-self:start}
+.video-marker{color:#64748b;font-size:10px;white-space:nowrap}
+.inbox-older{display:block;margin:12px auto;border:1px solid #dbe7e7;border-radius:8px;background:white;color:#12857b;padding:8px 12px;font-size:12px}
+.webhook-status{border:1px solid #dbeeea;background:#f2faf8;border-radius:12px;padding:14px}
+.webhook-status strong{color:#207d75}
+.webhook-status p{margin:4px 0}
+.tiktok-settings-actions{display:grid;justify-items:start;gap:12px;margin-top:16px;text-align:start}
+.tiktok-settings-actions details{width:100%}
+.tiktok-settings-actions summary{cursor:pointer}

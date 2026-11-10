@@ -60,7 +60,7 @@ export function managerToken(request) {
   return request.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
 }
 
-export function setup(accessToken) {
+export function setup(accessToken, { webhook = false } = {}) {
   const { TIKTOK_CLIENT_ID: clientId, TIKTOK_CLIENT_SECRET: secret,
     TIKTOK_AUTHORIZATION_URL: authorizeUrl, TIKTOK_REDIRECT_URI: redirectUri,
     INBOX_TIKTOK_DB_TOKEN: dbToken, INBOX_SUPABASE_URL: databaseUrl,
@@ -75,8 +75,11 @@ export function setup(accessToken) {
     || callback.pathname !== "/api/tiktok/callback" || callback.search || callback.hash) {
     throw new IntegrationError("رابط التفويض أو العودة غير صالح.", 503);
   }
-  const db = accessToken && client(publishableKey, {
-    global: { headers: { Authorization: `Bearer ${accessToken}`, "x-inbox-tiktok-key": dbToken } },
+  const db = (accessToken || webhook) && client(publishableKey, {
+    global: { headers: {
+      ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+      "x-inbox-tiktok-key": dbToken,
+    } },
   });
   return { authorization, callback, clientId, secret, db };
 }
@@ -99,6 +102,7 @@ export function openManagerToken(encoded, state) {
 }
 
 export async function databaseAction(config, operation, payload = {}) {
+  if (config.openid) payload = { openid: config.openid, data: payload };
   const { data } = await config.db.rpc("link_inbox_tiktok_backend", { operation, payload }).throwOnError();
   return data;
 }
@@ -155,9 +159,9 @@ export async function saveConnection(config, data) {
   return saved.can_reply === true;
 }
 
-export async function getConnection(config) {
+export async function getConnection(config, existing) {
   const { clientId, secret } = config;
-  const data = await databaseAction(config, "get_connection");
+  const data = existing ?? await databaseAction(config, "get_connection");
   if (!data) throw new IntegrationError("فوّض حساب تيك توك أولًا من زر ربط الحساب.", 409);
   if (Date.parse(data.expires_at) > Date.now() + 60_000) return data;
 
