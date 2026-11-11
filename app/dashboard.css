@@ -28,3 +28,53 @@
 .tiktok-settings-actions{display:grid;justify-items:start;gap:12px;margin-top:16px;text-align:start}
 .tiktok-settings-actions details{width:100%}
 .tiktok-settings-actions summary{cursor:pointer}
+
+.reply-emoji {
+  margin-block-start: 8px;
+}
+.reply-emoji-trigger, .reply-emoji-options button {
+  border: 1px solid #e5eaf0;
+  border-radius: 8px;
+  background: #fff;
+  color: #46566c;
+}
+.reply-emoji-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.reply-emoji-trigger span {
+  font-size: 16px;
+}
+.reply-emoji-options:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  gap: 4px;
+  width: min(100%, 360px);
+  margin-block-start: 6px;
+  padding: 6px;
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+  background: #f7f8fb;
+}
+.reply-emoji-options button {
+  min-height: 40px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+.reply-emoji button:hover:not(:disabled), .reply-emoji-trigger[aria-expanded="true"] {
+  background: #eaf7f5;
+  border-color: #b6ded8;
+}
+.reply-emoji button:focus-visible {
+  outline: 2px solid #128c81;
+  outline-offset: 2px;
+}
+.reply-emoji button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
