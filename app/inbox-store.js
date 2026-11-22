@@ -40,7 +40,7 @@ export async function loadConversations(client, members, { video, type, status, 
 }
 
 export async function loadTikTokVideos(client) {
-  const { data } = await client.rpc("link_inbox_tiktok_videos").throwOnError();
+  const { data } = await client.rpc("link_inbox_video_catalog").throwOnError();
   return data;
 }
 

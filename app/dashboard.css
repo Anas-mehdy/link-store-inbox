@@ -156,3 +156,32 @@
   border-color: #168b88;
   background: #f0faf8;
 }
+
+.video-card { margin: 16px 22px 0; padding: 14px; border: 1px solid #d6e6e5; border-radius: 12px; background: #f7fbfa; }
+.video-card-top { display: flex; gap: 14px; align-items: flex-start; }
+.video-card-top img, .video-cover-empty { width: 76px; height: 98px; border-radius: 8px; flex: none; object-fit: cover; }
+.video-cover-empty { display: grid; place-items: center; background: #e2efed; color: #4a746f; }
+.video-card-copy { min-width: 0; overflow-wrap: anywhere; }
+.video-card-copy small, .video-comment-time { color: #526777; font-size: .8125rem; }
+.video-card-copy strong { display: block; margin: 5px 0; font-size: 1rem; }
+.video-card-copy p { margin: 0; line-height: 1.6; font-size: .9375rem; white-space: pre-line; }
+.caption-short { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.video-card-actions, .video-title-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.video-card-actions a, .video-card-actions button, .video-title-form button, .card-text-action {
+  font: inherit; font-size: .875rem; color: #116e69; background: #fff; border: 1px solid #cddfdd; border-radius: 7px;
+  padding: 6px 10px; text-decoration: none;
+}
+.card-text-action { background: transparent; border: none; padding-inline: 0; }
+.video-title-form label { display: grid; gap: 5px; flex: 1 1 180px; font-size: .875rem; }
+.video-title-form input { width: 100%; padding: 8px; border: 1px solid #cddfdd; border-radius: 6px; }
+.video-comment-time { display: block; margin-top: 10px; }
+.entrybottom .video-marker { flex: 1 1 90px; overflow: hidden; text-overflow: ellipsis; text-align: end; }
+@media (max-width: 720px) {
+  .video-card { margin: 12px 14px 0; padding: 12px; }
+  .video-card-actions button, .video-card-actions a, .video-title-form button { min-height: 44px; display: inline-flex; align-items: center; }
+  .video-title-form input { font-size: 1rem; }
+}
+.video-card-top .video-embed-preview {
+  flex: 0 0 auto; width: min(40%, 160px); aspect-ratio: 9/16;
+  border: 0; border-radius: 8px; background: #e2efed;
+}

@@ -7,6 +7,9 @@ export function useInboxLive(team, { term, video, type, status }) {
   const [connection, setConnection] = useState("connecting");
   const [counts, setCounts] = useState(null);
   const [videos, setVideos] = useState([]);
+  const patchVideo = useCallback((id, changes) => {
+    setVideos(previous => previous.map(v => v.video_id === id ? { ...v, ...changes } : v));
+  }, []);
   const [summaryError, setSummaryError] = useState(false);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(n => n + 1), []);
@@ -86,7 +89,7 @@ export function useInboxLive(team, { term, video, type, status }) {
 
   const visible = feed?.key === key ? feed : null;
   return {
-    counts, videos, connection, summaryError, refresh,
+    counts, videos, connection, summaryError, refresh, patchVideo,
     updateItem(id, apply) {
       setFeed(previous => previous && {
         ...previous, items: previous.items.map(item => item.id === id ? apply(item) : item),

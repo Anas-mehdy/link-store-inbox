@@ -1,8 +1,9 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import { publishTikTokReply, saveConversation, saveDraft } from "./inbox-store";
 import { useInboxLive } from "./inbox-live";
 import TikTokSettings from "./tiktok-settings";
+import VideoCard, { videoLabel, videoLink } from "./video-card";
 import EmojiInput from "./emoji-input";
 
 const initial=[
@@ -37,6 +38,7 @@ export default function Inbox({ team }){
    live.refresh();
  }
 
+ const videoById = useMemo(() => new Map(live.videos.map(v => [v.video_id, v])), [live.videos]);
  const inReplyQueue = tab === "needs_reply";
  const demoList = items.filter(item =>
    (tab === "all" || item.type === tab || (inReplyQueue && needsReply(item))) && (filter === "all" || item.status === filter)
@@ -185,20 +187,27 @@ export default function Inbox({ team }){
    <label htmlFor="inbox-video">فيديو تيك توك</label>
    <select id="inbox-video" value={video} disabled={saving} onChange={event => {setVideo(event.target.value);resetSelection()}}>
      <option value="">كل الفيديوهات</option>
-     {live.videos.map(({ video_id: id, comment_count: count }) =>
-       <option key={id} value={id}>{`فيديو ⁦${id}⁩ · ${count} تعليق`}</option>)}
+     {live.videos.map(v =>
+       <option key={v.video_id} value={v.video_id}>{`${videoLabel(v, v.video_id)} · ${v.comment_count} تعليق`}</option>)}
    </select>
-   {video && <a href={tiktokVideoLink(video)} target="_blank" rel="noreferrer">فتح الفيديو ↗</a>}
+   {video && <a href={videoLink(video)} target="_blank" rel="noreferrer">فتح الفيديو ↗</a>}
  </div>}
  </div>
- <div className="entries">{list.length?list.map(x=><button key={x.id} className={"entry "+(current?.id===x.id?"active":"")} disabled={saving} onClick={()=>openThread(x.id)}><div className="avatar">{x.avatar}</div><div className="entrydetails"><div className="entrytop"><strong>{x.name}</strong><small>{x.time}</small></div><div className="entrytext">{x.body}</div><div className="entrybottom"><span className={"type "+x.type}>{x.type==="comment"?"تعليق":"رسالة"}</span><span className={"status "+x.status}>{labels[x.status]}</span>{x.tiktok_video_id && <span className="video-marker" title={x.tiktok_video_id}>فيديو <bdi>{x.tiktok_video_id.slice(-7)}</bdi></span>}</div></div></button>)
+ <div className="entries">{list.length?list.map(x=><button key={x.id} className={"entry "+(current?.id===x.id?"active":"")} disabled={saving} onClick={()=>openThread(x.id)}><div className="avatar">{x.avatar}</div><div className="entrydetails"><div className="entrytop"><strong>{x.name}</strong><small>{x.time}</small></div><div className="entrytext">{x.body}</div><div className="entrybottom"><span className={"type "+x.type}>{x.type==="comment"?"تعليق":"رسالة"}</span><span className={"status "+x.status}>{labels[x.status]}</span>{x.tiktok_video_id && <span className="video-marker" title={x.tiktok_video_id}>{videoLabel(videoById.get(x.tiktok_video_id), x.tiktok_video_id)}</span>}</div></div></button>)
  : <div className="empty" role="status">{team && live.loading ? "جارٍ تحميل المحادثات…" : live.error ? "تعذّر تحديث المحادثات" : inReplyQueue && !query && !video && filter === "all" ? "ما في تعليقات بحاجة لرد" : "لا توجد نتائج مطابقة"}</div>}
  {live.error && <button className="inbox-older" onClick={live.refresh}>إعادة المحاولة</button>}
  {live.hasMore && !live.error && <button className="inbox-older" disabled={live.loadingMore} onClick={live.loadMore}>
    {live.loadingMore ? "جارٍ التحميل…" : inReplyQueue ? "عرض التعليقات التالية" : "عرض محادثات أقدم"}
  </button>}
  </div></div>
- <div className="conversation"><button type="button" className="back-to-list" onClick={() => {setMobileThread(false);scrollWorkspace()}}>رجوع إلى المحادثات</button>{current?<><div className="convhead"><div className="person"><div className="avatar large">{current.avatar}</div><div><h2>{current.name}</h2><span>@{current.handle}</span></div></div><span className={"status "+current.status}>{labels[current.status]}</span></div><div className="context"><span>{current.type==="comment"?"تعليق على منشور":"رسالة خاصة"}</span><b>{current.tiktok_video_id ? <a href={tiktokVideoLink(current.tiktok_video_id)} target="_blank" rel="noreferrer">{current.source}</a> : current.source}</b><small>{current.time}</small></div><div className="thread"><div className="bubble customer"><span>{current.name}</span><p>{current.body}</p></div>{current.replies.map((r,i)=><div className="bubble agent" key={r.id ?? i}><span>{r.by}{r.delivery && ` · ${deliveryLabels[r.delivery]}`}</span><p>{r.text}</p></div>)}<div className="threadhint"><Icon name="shield" size={14}/> {team ? "المسودات داخلية وغير منشورة على تيك توك" : "الردود هنا محلية وتجريبية ولا تُرسل إلى TikTok"}</div></div><form onSubmit={reply} className="composer">
+ <div className="conversation"><button type="button" className="back-to-list" onClick={() => {setMobileThread(false);scrollWorkspace()}}>رجوع إلى المحادثات</button>{current?<><div className="convhead"><div className="person"><div className="avatar large">{current.avatar}</div><div><h2>{current.name}</h2><span>@{current.handle}</span></div></div><span className={"status "+current.status}>{labels[current.status]}</span></div>{team && current.tiktok_video_id
+   ? <VideoCard key={current.tiktok_video_id} id={current.tiktok_video_id} card={videoById.get(current.tiktok_video_id)}
+       client={team.client} onSaved={live.patchVideo} disabled={saving} time={current.time} onShowComments={() => {
+         setVideo(current.tiktok_video_id); setTab("comment"); setFilter("all"); setQuery("");
+         resetSelection(); scrollWorkspace();
+       }} />
+   : <div className="context"><span>{current.type==="comment"?"تعليق على منشور":"رسالة خاصة"}</span><b>{current.source}</b><small>{current.time}</small></div>}
+ <div className="thread"><div className="bubble customer"><span>{current.name}</span><p>{current.body}</p></div>{current.replies.map((r,i)=><div className="bubble agent" key={r.id ?? i}><span>{r.by}{r.delivery && ` · ${deliveryLabels[r.delivery]}`}</span><p>{r.text}</p></div>)}<div className="threadhint"><Icon name="shield" size={14}/> {team ? "المسودات داخلية وغير منشورة على تيك توك" : "الردود هنا محلية وتجريبية ولا تُرسل إلى TikTok"}</div></div><form onSubmit={reply} className="composer">
  <EmojiInput
    key={current.id}
    label={team ? "اكتب مسودة الرد" : "اكتب الرد التجريبي"}
@@ -214,8 +223,4 @@ export default function Inbox({ team }){
  <div className="details"><h2>تفاصيل المحادثة</h2>{current&&<><div className="detailavatar">{current.avatar}</div><h3>{current.name}</h3><p className="handle">@{current.handle}</p><div className="detailrow"><span>النوع</span><b>{current.type==="comment"?"تعليقات المنشورات":"الرسائل الخاصة"}</b></div><div className="detailrow"><span>المسؤول</span><select aria-label="المسؤول" value={current.assigned} disabled={saving || !canAssign} onChange={e=>mutate({assigned:e.target.value}, {assigned_to:e.target.value || null})}><option value={unassigned}>غير مسند</option>{current.assigned !== unassigned && !assignees.some(([id])=>id===current.assigned) && <option value={current.assigned} disabled>عضو سابق</option>}{assignees.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></div><div className="detailrow"><span>الحالة</span><select aria-label="حالة المحادثة" value={current.status} disabled={saving} onChange={e=>mutate({status:e.target.value}, {status:e.target.value})}><option value="new">جديد</option><option value="open">قيد المعالجة</option><option value="done">مغلق</option></select></div><div className="detailrow"><span>الأولوية</span><b>{current.priority==="high"?"مرتفعة":"عادية"}</b></div><div className="detailnote">{team ? "تُحفظ الحالة والمسؤول والمسودات في صندوق الوارد." : "التعديلات مؤقتة داخل هذه الصفحة. لن تُحفظ في قاعدة بيانات ولن تؤثر على حساب TikTok."}</div></>}</div></div></section>:
  <section className="body secondary"><div className="heading"><div><h1>{view==="analytics"?"إحصائيات خدمة العملاء":view==="team"?"إدارة الموظفين":"إعدادات التكامل"}</h1><p>{team ? "مساحة عمل فريق خدمة العملاء" : "معاينة أولية — غير متصلة ببيانات فعلية"}</p></div></div>{view==="analytics"?<div className="placeholderCard"><Icon name="chart" size={32}/><h2>تقارير أولية</h2><p>إجمالي المحادثات: {counts?.total ?? "—"} • مغلقة: {counts?.done ?? "—"}</p><p>ستظهر تقارير وقت الرد وأداء الموظفين بعد تفعيل حفظ البيانات.</p></div>:view==="team"?<div className="placeholderCard"><Icon name="users" size={32}/><h2>حسابات الفريق</h2>{team ? <ul>{team.members.map(person=><li key={person.user_id}>{person.display_name} · {person.role === "manager" ? "مدير" : "موظف"}</li>)}</ul> : <p>تظهر حسابات الفريق بعد إعداد تسجيل الدخول.</p>}</div>:<div className="placeholderCard"><Icon name="settings" size={32}/><h2>حالة التكامل</h2><p>تظهر التعليقات العامة الجديدة في صندوق الوارد بعد تفعيل المزامنة.</p><p>Business Messaging API: تم تقديم الطلب، وحالة الموافقة غير مؤكدة.</p></div>}{view === "settings" && team?.member.role === "manager" && <TikTokSettings team={team} onImported={receiveImported} />}</section>}
  </main></div>;
-}
-
-function tiktokVideoLink(id) {
-  return `https://www.tiktok.com/@link.60/video/${id}`;
 }
