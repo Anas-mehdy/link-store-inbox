@@ -1,6 +1,6 @@
 const conversationFields = `
-  id, type, name, handle, body, source, status, assigned_to, priority, received_at,
-  drafts:link_inbox_drafts(id, body, author_id, created_at)
+  id, type, name, handle, body, source, status, assigned_to, priority, received_at, tiktok_video_id, tiktok_comment_id,
+  drafts:link_inbox_drafts(id, body, author_id, created_at, tiktok_delivery)
 `;
 const dateFormat = new Intl.DateTimeFormat("ar-SA", {
   calendar: "gregory", dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh",
@@ -13,25 +13,48 @@ export async function loadInbox(client, userId) {
   const member = members.find(person => person.user_id === userId);
   if (!member) return {};
 
-  const { data } = await client.from("link_inbox_conversations")
-    .select(conversationFields)
-    .order("received_at", { ascending: false })
-    .order("id", { ascending: false })
-    .order("created_at", { referencedTable: "drafts" })
-    .limit(100)
-    .throwOnError();
+  return { member, members };
+}
 
+export const inboxPageSize = 100;
+
+export async function loadConversations(client, members, { video, type, status, term, before, signal }) {
+  const needsReply = type === "needs_reply";
+  const source = term || needsReply
+    ? client.rpc(needsReply ? "link_inbox_needs_reply" : "link_inbox_search", { term }, { get: true, count: "exact" }).select(conversationFields)
+    : client.from("link_inbox_conversations").select(conversationFields, { count: "exact" });
+  let query = source.order("received_at", { ascending: needsReply })
+    .order("id", { ascending: needsReply })
+    .order("created_at", { referencedTable: "drafts" })
+    .limit(inboxPageSize);
+  if (video) query = query.eq("tiktok_video_id", video);
+  if (!needsReply && type !== "all") query = query.eq("type", type);
+  if (status !== "all") query = query.eq("status", status);
+  if (before) {
+    const { received_at: time, id } = before;
+    const after = needsReply ? "gt" : "lt";
+    query = query.or(`received_at.${after}.${time},and(received_at.eq.${time},id.${after}.${id})`);
+  }
+  const { data, count } = await query.abortSignal(signal).throwOnError();
+  return { items: data.map(row => inboxItem(row, members)), count };
+}
+
+export async function loadTikTokVideos(client) {
+  const { data } = await client.rpc("link_inbox_video_catalog").throwOnError();
+  return data;
+}
+
+export function inboxItem(row, members) {
   return {
-    member, members, items: data.map(row => ({
-      ...row,
-      avatar: row.name.slice(0, 1),
-      time: dateFormat.format(new Date(row.received_at)),
-      assigned: row.assigned_to ?? "",
-      replies: row.drafts.map(draft => ({
-        id: draft.id,
-        by: members.find(person => person.user_id === draft.author_id)?.display_name ?? "عضو سابق",
-        text: draft.body,
-      })),
+    ...row,
+    avatar: row.name.slice(0, 1),
+    time: dateFormat.format(new Date(row.received_at)),
+    assigned: row.assigned_to ?? "",
+    replies: (row.drafts ?? []).map(draft => ({
+      id: draft.id,
+      by: members.find(person => person.user_id === draft.author_id)?.display_name ?? "عضو سابق",
+      text: draft.body,
+      delivery: draft.tiktok_delivery,
     })),
   };
 }
@@ -46,4 +69,17 @@ export async function saveDraft(client, { id, conversationId, text }) {
     { id, conversation_id: conversationId, body: text },
     { onConflict: "id", ignoreDuplicates: true },
   ).throwOnError();
+}
+
+export async function publishTikTokReply(client, { conversationId, body }) {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) throw new Error("سجّل الدخول أولًا.");
+  const response = await fetch("/api/tiktok/reply", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, body }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
 }
