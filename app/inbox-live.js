@@ -25,6 +25,9 @@ export function useInboxLive(team, { term, video, type, status }) {
     }
     const channel = client.channel("link-inbox-conversations").on("postgres_changes", {
       event: "*", schema: "public", table: "link_inbox_conversations",
+    }, scheduleRefresh).on("postgres_changes", {
+      event: "UPDATE", schema: "public", table: "link_inbox_drafts",
+      filter: "tiktok_delivery=eq.published",
     }, scheduleRefresh).subscribe(state => {
       setConnection(state === "SUBSCRIBED" ? "live" : "offline");
       if (state === "SUBSCRIBED") scheduleRefresh();

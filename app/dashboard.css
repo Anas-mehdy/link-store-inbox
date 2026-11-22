@@ -150,3 +150,9 @@
   .searchbar { min-height: 44px; }
   .filterrow select, .video-filter select, .detailrow select { font-size: 1rem; }
 }
+
+.reply-queue-stat { text-align: start; color: inherit; }
+.reply-queue-stat:hover, .reply-queue-stat[aria-pressed="true"] {
+  border-color: #168b88;
+  background: #f0faf8;
+}

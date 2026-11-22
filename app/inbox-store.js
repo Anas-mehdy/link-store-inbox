@@ -19,19 +19,21 @@ export async function loadInbox(client, userId) {
 export const inboxPageSize = 100;
 
 export async function loadConversations(client, members, { video, type, status, term, before, signal }) {
-  const source = term
-    ? client.rpc("link_inbox_search", { term }, { get: true, count: "exact" }).select(conversationFields)
+  const needsReply = type === "needs_reply";
+  const source = term || needsReply
+    ? client.rpc(needsReply ? "link_inbox_needs_reply" : "link_inbox_search", { term }, { get: true, count: "exact" }).select(conversationFields)
     : client.from("link_inbox_conversations").select(conversationFields, { count: "exact" });
-  let query = source.order("received_at", { ascending: false })
-    .order("id", { ascending: false })
+  let query = source.order("received_at", { ascending: needsReply })
+    .order("id", { ascending: needsReply })
     .order("created_at", { referencedTable: "drafts" })
     .limit(inboxPageSize);
   if (video) query = query.eq("tiktok_video_id", video);
-  if (type !== "all") query = query.eq("type", type);
+  if (!needsReply && type !== "all") query = query.eq("type", type);
   if (status !== "all") query = query.eq("status", status);
   if (before) {
     const { received_at: time, id } = before;
-    query = query.or(`received_at.lt.${time},and(received_at.eq.${time},id.lt.${id})`);
+    const after = needsReply ? "gt" : "lt";
+    query = query.or(`received_at.${after}.${time},and(received_at.eq.${time},id.${after}.${id})`);
   }
   const { data, count } = await query.abortSignal(signal).throwOnError();
   return { items: data.map(row => inboxItem(row, members)), count };

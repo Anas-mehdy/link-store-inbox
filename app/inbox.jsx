@@ -14,6 +14,10 @@ const initial=[
 {id:6,type:"comment",name:"تركي",handle:"t.ksa",avatar:"ت",body:"هل عندكم حماية عدسات للآيفون 17 برو؟",source:"فيديو عدسات Link",time:"أمس",status:"new",assigned:"غير مسند",replies:[],priority:"normal"}
 ];
 const Icon=({name,size=19})=>{const paths={inbox:<><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 13h5l2 3h4l2-3h5"/></>,message:<><path d="M21 11a8 8 0 0 1-8 8H6l-3 2v-9a8 8 0 1 1 18-1Z"/></>,chat:<><path d="M4 4h16v13H8l-4 4z"/></>,chart:<><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></>,users:<><circle cx="9" cy="8" r="3"/><path d="M2 20v-2a7 7 0 0 1 14 0v2M17 5a3 3 0 0 1 0 6m2 9v-2a6 6 0 0 0-2-4"/></>,settings:<><circle cx="12" cy="12" r="3"/><path d="m12 2 2 2 3-1 1 3 3 2-2 3 2 3-3 2-1 3-3-1-2 2-2-2-3 1-1-3-3-2 2-3-2-3 3-2 1-3 3 1z"/></>,search:<><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></>,send:<><path d="m21 3-8 18-3-8-8-3zM21 3 10 13"/></>,check:<path d="m4 12 5 5L20 6"/>,clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,shield:<><path d="M12 2 4 6v6c0 5 3 8 8 10 5-2 8-5 8-10V6z"/><path d="m8 12 3 3 5-5"/></>,logout:<path d="M10 4H4v16h6m4-4 4-4-4-4m-7 4h11"/>,menu:<path d="M3 6h18M3 12h18M3 18h18"/>,filter:<path d="M3 5h18l-7 8v6l-4 2v-8z"/>,bell:<><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z"/><path d="M10 21h4"/></>,bolt:<path d="m13 2-9 12h7l-1 8 10-13h-7z"/>};return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]||paths.inbox}</svg>};
+function needsReply(item) {
+ return item.type === "comment" && item.status !== "done"
+   && !item.replies.some(reply => reply.delivery === "published");
+}
 export default function Inbox({ team }){
  const [items,setItems]=useState(initial),[active,setActive]=useState(null),[tab,setTab]=useState("all"),[view,setView]=useState("inbox"),[filter,setFilter]=useState("all"),[query,setQuery]=useState(""),[draftEntry,setDraftEntry]=useState(null),[mobileMenu,setMobileMenu]=useState(false);
  const [video, setVideo] = useState("");
@@ -33,16 +37,19 @@ export default function Inbox({ team }){
    live.refresh();
  }
 
- const list = team ? live.items : items.filter(item =>
-   (tab === "all" || item.type === tab) && (filter === "all" || item.status === filter)
+ const inReplyQueue = tab === "needs_reply";
+ const demoList = items.filter(item =>
+   (tab === "all" || item.type === tab || (inReplyQueue && needsReply(item))) && (filter === "all" || item.status === filter)
    && [item.name, item.body, item.source, item.handle].join(" ").toLowerCase().includes(query.trim().toLowerCase()));
+ const list = team ? (inReplyQueue ? live.items.filter(needsReply) : live.items)
+   : (inReplyQueue ? demoList.reverse() : demoList);
  const current = list.find(item => item.id === active) ?? list[0];
  const draft = current && draftEntry?.id === current.id ? draftEntry.text : "";
  const counts = team ? live.counts : {
-   total: items.length, ...Object.fromEntries(["new", "open", "done"].map(status =>
+   total: items.length, needs_reply: items.filter(needsReply).length, ...Object.fromEntries(["new", "open", "done"].map(status =>
      [status, items.filter(item => item.status === status).length])),
  };
- const pending = counts?.new;
+ const pending = counts?.needs_reply;
  const [saving,setSaving]=useState(false),[error,setError]=useState(""),[draftId,setDraftId]=useState(null);
  const canAssign = !team || team.member.role === "manager";
  const canPublish = team?.member.role === "manager" && current?.tiktok_comment_id;
@@ -168,10 +175,12 @@ export default function Inbox({ team }){
  {view==="inbox"?"صندوق الوارد":view==="analytics"?"الإحصائيات":view==="team"?"الموظفون":"الإعدادات"}</span></div><div className="topactions"><span className="demoTag"><span className="dot"/> {team ? "وضع الفريق" : "Demo Mode"}</span>{team ? <button className="signout" onClick={team.signOut}>تسجيل الخروج</button> : <button className="iconbtn" aria-label="الإشعارات"><Icon name="bell"/></button>}<div className="profile" title={team?.member.display_name}>{team?.member.display_name.slice(0, 1) ?? "أ"}</div></div></header>
  {team?.signOutError && <p className="inbox-error" role="alert">{team.signOutError}</p>}
  {view==="inbox"? <section className="body"><div className="heading"><div><h1>صندوق الوارد</h1><p>إدارة تعليقات ورسائل العملاء في مكان واحد</p></div><span className="mocknotice"><Icon name="shield" size={17}/> {team ? (live.connection === "live" ? "التحديث المباشر متصل" : live.connection === "offline" ? "التحديث المباشر يعيد الاتصال" : "جارٍ الاتصال بالتحديث المباشر") : "بيانات افتراضية للاختبار فقط"}</span></div>
- <div className="stats"><div className="stat"><span>المحادثات الإجمالية</span><strong>{counts?.total ?? "—"}</strong><small>{team ? "كل المحادثات المحفوظة" : "في بيانات العرض"}</small></div><div className="stat"><span>بانتظار الرد</span><strong>{pending ?? "—"}</strong><small>تحتاج اهتمامك</small></div><div className="stat"><span>قيد المعالجة</span><strong>{counts?.open ?? "—"}</strong><small>محادثات مفتوحة</small></div><div className="stat"><span>{team ? "مغلقة" : "تم الرد"}</span><strong>{counts?.done ?? "—"}</strong><small>حالات مغلقة</small></div></div>
+ <div className="stats"><div className="stat"><span>المحادثات الإجمالية</span><strong>{counts?.total ?? "—"}</strong><small>{team ? "كل المحادثات المحفوظة" : "في بيانات العرض"}</small></div><button type="button" className="stat reply-queue-stat" aria-pressed={inReplyQueue} disabled={saving} onClick={() => {
+   setTab("needs_reply"); setFilter("all"); setVideo(""); setQuery(""); resetSelection(); scrollWorkspace();
+ }}><span>بحاجة لرد</span><strong>{pending ?? "—"}</strong><small>عرض التعليقات من الأقدم</small></button><div className="stat"><span>قيد المعالجة</span><strong>{counts?.open ?? "—"}</strong><small>محادثات مفتوحة</small></div><div className="stat"><span>{team ? "مغلقة" : "تم الرد"}</span><strong>{counts?.done ?? "—"}</strong><small>حالات مغلقة</small></div></div>
  {error && <p className="inbox-error" role="alert">{error}</p>}
  {team && live.summaryError && <p role="status">تعذّر تحديث الأعداد أو قائمة الفيديوهات. <button onClick={live.refresh}>إعادة المحاولة</button></p>}
- <div ref={workspace} className={"workspace " + (mobileThread ? "thread-open" : "")}><div className="listing"><div className="listhead"><h2>المحادثات <span>{team ? live.count ?? "…" : list.length}</span></h2><div className="switches">{[["all","الكل"],["comment","التعليقات"],["dm","الرسائل"]].map(([v,l])=><button key={v} className={tab===v?"on":""} disabled={saving} onClick={()=>{setTab(v);if(v==="dm")setVideo("");resetSelection();}}>{l}</button>)}</div><div className="searchbar"><Icon name="search" size={17}/><input aria-label="بحث في المحادثات" type="search" disabled={saving} value={query} onChange={e=>{setQuery(e.target.value);resetSelection()}} placeholder="ابحث عن عميل أو تعليق..."/></div><div className="filterrow"><Icon name="filter" size={15}/><select aria-label="تصفية الحالة" value={filter} disabled={saving} onChange={e=>{setFilter(e.target.value);resetSelection()}}><option value="all">جميع الحالات</option><option value="new">جديد</option><option value="open">قيد المعالجة</option><option value="done">مغلق</option></select></div>
+ <div ref={workspace} className={"workspace " + (mobileThread ? "thread-open" : "")}><div className="listing"><div className="listhead"><h2>{inReplyQueue ? "بحاجة لرد · الأقدم أولًا" : "المحادثات"} <span>{team ? live.count ?? "…" : list.length}</span></h2><div className="switches">{[["all","الكل"],["needs_reply","بحاجة لرد"],["comment","التعليقات"],["dm","الرسائل"]].map(([v,l])=><button key={v} className={tab===v?"on":""} disabled={saving} onClick={()=>{setTab(v);if(v==="needs_reply" && filter==="done")setFilter("all");if(v==="dm")setVideo("");resetSelection();}}>{l}</button>)}</div><div className="searchbar"><Icon name="search" size={17}/><input aria-label="بحث في المحادثات" type="search" disabled={saving} value={query} onChange={e=>{setQuery(e.target.value);resetSelection()}} placeholder="ابحث عن عميل أو تعليق..."/></div><div className="filterrow"><Icon name="filter" size={15}/><select aria-label="تصفية الحالة" value={filter} disabled={saving} onChange={e=>{setFilter(e.target.value);resetSelection()}}><option value="all">جميع الحالات</option><option value="new">جديد</option><option value="open">قيد المعالجة</option>{!inReplyQueue && <option value="done">مغلق</option>}</select></div>
  {team && tab !== "dm" && <div className="video-filter">
    <label htmlFor="inbox-video">فيديو تيك توك</label>
    <select id="inbox-video" value={video} disabled={saving} onChange={event => {setVideo(event.target.value);resetSelection()}}>
@@ -183,10 +192,10 @@ export default function Inbox({ team }){
  </div>}
  </div>
  <div className="entries">{list.length?list.map(x=><button key={x.id} className={"entry "+(current?.id===x.id?"active":"")} disabled={saving} onClick={()=>openThread(x.id)}><div className="avatar">{x.avatar}</div><div className="entrydetails"><div className="entrytop"><strong>{x.name}</strong><small>{x.time}</small></div><div className="entrytext">{x.body}</div><div className="entrybottom"><span className={"type "+x.type}>{x.type==="comment"?"تعليق":"رسالة"}</span><span className={"status "+x.status}>{labels[x.status]}</span>{x.tiktok_video_id && <span className="video-marker" title={x.tiktok_video_id}>فيديو <bdi>{x.tiktok_video_id.slice(-7)}</bdi></span>}</div></div></button>)
- : <div className="empty" role="status">{team && live.loading ? "جارٍ تحميل المحادثات…" : live.error ? "تعذّر تحديث المحادثات" : "لا توجد نتائج مطابقة"}</div>}
+ : <div className="empty" role="status">{team && live.loading ? "جارٍ تحميل المحادثات…" : live.error ? "تعذّر تحديث المحادثات" : inReplyQueue && !query && !video && filter === "all" ? "ما في تعليقات بحاجة لرد" : "لا توجد نتائج مطابقة"}</div>}
  {live.error && <button className="inbox-older" onClick={live.refresh}>إعادة المحاولة</button>}
  {live.hasMore && !live.error && <button className="inbox-older" disabled={live.loadingMore} onClick={live.loadMore}>
-   {live.loadingMore ? "جارٍ التحميل…" : "عرض محادثات أقدم"}
+   {live.loadingMore ? "جارٍ التحميل…" : inReplyQueue ? "عرض التعليقات التالية" : "عرض محادثات أقدم"}
  </button>}
  </div></div>
  <div className="conversation"><button type="button" className="back-to-list" onClick={() => {setMobileThread(false);scrollWorkspace()}}>رجوع إلى المحادثات</button>{current?<><div className="convhead"><div className="person"><div className="avatar large">{current.avatar}</div><div><h2>{current.name}</h2><span>@{current.handle}</span></div></div><span className={"status "+current.status}>{labels[current.status]}</span></div><div className="context"><span>{current.type==="comment"?"تعليق على منشور":"رسالة خاصة"}</span><b>{current.tiktok_video_id ? <a href={tiktokVideoLink(current.tiktok_video_id)} target="_blank" rel="noreferrer">{current.source}</a> : current.source}</b><small>{current.time}</small></div><div className="thread"><div className="bubble customer"><span>{current.name}</span><p>{current.body}</p></div>{current.replies.map((r,i)=><div className="bubble agent" key={r.id ?? i}><span>{r.by}{r.delivery && ` · ${deliveryLabels[r.delivery]}`}</span><p>{r.text}</p></div>)}<div className="threadhint"><Icon name="shield" size={14}/> {team ? "المسودات داخلية وغير منشورة على تيك توك" : "الردود هنا محلية وتجريبية ولا تُرسل إلى TikTok"}</div></div><form onSubmit={reply} className="composer">
