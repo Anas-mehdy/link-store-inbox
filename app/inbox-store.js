@@ -13,26 +13,28 @@ export async function loadInbox(client, userId) {
   const member = members.find(person => person.user_id === userId);
   if (!member) return {};
 
-  const items = await loadConversations(client, members);
-  return { member, members, items };
+  return { member, members };
 }
 
 export const inboxPageSize = 100;
 
-export async function loadConversations(client, members, { video, before } = {}) {
-  let query = client.from("link_inbox_conversations")
-    .select(conversationFields)
-    .order("received_at", { ascending: false })
+export async function loadConversations(client, members, { video, type, status, term, before, signal }) {
+  const source = term
+    ? client.rpc("link_inbox_search", { term }, { get: true, count: "exact" }).select(conversationFields)
+    : client.from("link_inbox_conversations").select(conversationFields, { count: "exact" });
+  let query = source.order("received_at", { ascending: false })
     .order("id", { ascending: false })
     .order("created_at", { referencedTable: "drafts" })
     .limit(inboxPageSize);
   if (video) query = query.eq("tiktok_video_id", video);
+  if (type !== "all") query = query.eq("type", type);
+  if (status !== "all") query = query.eq("status", status);
   if (before) {
     const { received_at: time, id } = before;
     query = query.or(`received_at.lt.${time},and(received_at.eq.${time},id.lt.${id})`);
   }
-  const { data } = await query.throwOnError();
-  return data.map(row => inboxItem(row, members));
+  const { data, count } = await query.abortSignal(signal).throwOnError();
+  return { items: data.map(row => inboxItem(row, members)), count };
 }
 
 export async function loadTikTokVideos(client) {
@@ -53,13 +55,6 @@ export function inboxItem(row, members) {
       delivery: draft.tiktok_delivery,
     })),
   };
-}
-
-export function mergeConversations(previous, incoming) {
-  const byId = new Map(incoming.map(item => [item.id, item]));
-  for (const item of previous) byId.set(item.id, item);
-  return [...byId.values()].sort((left, right) =>
-    right.received_at.localeCompare(left.received_at) || right.id.localeCompare(left.id));
 }
 
 export async function saveConversation(client, id, changes) {

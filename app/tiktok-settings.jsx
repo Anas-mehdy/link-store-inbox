@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadInbox } from "./inbox-store";
 
 export default function TikTokSettings({ team, onImported }) {
   const [video, setVideo] = useState("");
@@ -65,9 +64,7 @@ export default function TikTokSettings({ team, onImported }) {
         window.location.assign(data.url);
         return;
       }
-      const fresh = await loadInbox(team.client, team.member.user_id);
-      if (!fresh.member) throw new Error("ما قدرنا نحدّث صندوق الوارد. حدّث الصفحة.");
-      onImported(fresh.items);
+      onImported();
       setCursor(data.nextCursor);
       setStatus(data.count
         ? `تمت مزامنة ${data.count} تعليق بهالصفحة، والتعليقات الموجودة محفوظة بلا تكرار.`

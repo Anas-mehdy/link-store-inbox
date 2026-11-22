@@ -78,3 +78,75 @@
   cursor: not-allowed;
   opacity: .4;
 }
+
+/* Reading and replying are the primary tasks on both desktop and touch screens. */
+.stat span, .heading p, .details .handle, .person span,
+.video-filter, .switches button, .filterrow select, .detailrow,
+.detailrow select, .composebar button, .inbox-older, .reply-emoji-trigger {
+  font-size: .875rem;
+}
+.searchbar input, .composer textarea, .bubble p, .entrytop strong,
+.person h2, .listhead h2, .details h2 {
+  font-size: 1rem;
+}
+.entrytext, .context b, .detailrow b { font-size: .9375rem; }
+.context span, .context small, .entrytop small, .stat small, .threadhint,
+.video-marker, .type, .status, .bubble span, .composebar span, .detailnote {
+  font-size: .8125rem;
+}
+.entrytext, .entrytop small, .stat span, .stat small, .context span,
+.context small, .threadhint, .detailrow span, .heading p { color: #586980; }
+.entrytop { align-items: baseline; flex-wrap: wrap; }
+.entrybottom, .composebar { flex-wrap: wrap; }
+.entrytop strong, .person, .context, .bubble, .details { overflow-wrap: anywhere; }
+.entrytext { line-height: 1.6; }
+.bubble p { white-space: pre-wrap; }
+.searchbar:focus-within { outline: 2px solid #168b88; outline-offset: 1px; }
+.back-to-list, .nav-shade { display: none; }
+@media (min-width: 721px) and (max-width: 1250px) {
+  .details { display: block; grid-column: 1 / -1; text-align: start; border-top: 1px solid #e9edf3; }
+  .details .detailavatar, .details h3, .details .handle { display: none; }
+}
+@media (max-width: 850px) {
+  .nav-shade {
+    display: block; position: fixed; inset: 0; z-index: 9;
+    background: #111a2e66; border: 0;
+  }
+}
+@media (max-width: 720px) {
+  .top { height: 56px; }
+  .topright, .topactions { gap: 8px; }
+  .topactions .demoTag, .breadcrumbs b, .breadcrumb-parent { display: none; }
+  .body { padding: 12px; }
+  .heading { flex-wrap: wrap; align-items: center; margin-block: 6px 14px; }
+  .heading h1 { font-size: 1.4rem; }
+  .heading p, .stat small { display: none; }
+  .mocknotice { display: flex; padding: 7px; font-size: .75rem; }
+  .stats { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+  .stat { padding: 10px 12px; }
+  .stat strong { margin: 3px 0 0; font-size: 1.4rem; }
+  .workspace { display: block; min-height: 0; scroll-margin-top: 8px; }
+  .listing { border: 0; }
+  .listhead { padding: 14px; }
+  .entries { max-height: 65vh; max-height: 65dvh; }
+  .entry { padding: 14px; }
+  .workspace .conversation, .workspace .details, .thread-open .listing { display: none; }
+  .thread-open .conversation { display: flex; min-height: 0; }
+  .thread-open .details { display: block; border: 0; border-top: 1px solid #e9edf3; padding: 16px; }
+  .details .detailavatar, .details h3, .details .handle { display: none; }
+  .back-to-list {
+    display: block; align-self: flex-start; margin: 8px 12px 0; padding: 9px 12px;
+    border: 0; border-radius: 8px; background: #eaf7f5; color: #116e69;
+  }
+  .convhead, .thread, .composer { padding: 14px; }
+  .context { margin: 12px 14px 0; }
+  .thread { min-height: 120px; }
+  .bubble { max-width: 95%; }
+  .composebar { justify-content: flex-start; }
+  .composebar span { display: none; }
+  .signout, .hamburger, .back-to-list, .switches button, .composebar button,
+  .reply-emoji-trigger, .reply-emoji-options button, .detailrow select,
+  .filterrow select, .video-filter select, .inbox-older { min-height: 44px; }
+  .searchbar { min-height: 44px; }
+  .filterrow select, .video-filter select, .detailrow select { font-size: 1rem; }
+}

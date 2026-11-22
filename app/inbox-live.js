@@ -1,84 +1,99 @@
-import { useEffect, useState } from "react";
-import { inboxItem, inboxPageSize, loadConversations, loadTikTokVideos, mergeConversations } from "./inbox-store";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadConversations, loadTikTokVideos } from "./inbox-store";
 
-export function useInboxLive(team, setItems, video, setVideoFeed) {
-  const [videos, setVideos] = useState([]);
-  const [connection, setConnection] = useState("connecting");
-  const [generation, setGeneration] = useState(0);
-  const [catalogError, setCatalogError] = useState(false);
+export function useInboxLive(team, { term, video, type, status }) {
   const client = team?.client;
   const members = team?.members;
+  const [connection, setConnection] = useState("connecting");
+  const [counts, setCounts] = useState(null);
+  const [videos, setVideos] = useState([]);
+  const [summaryError, setSummaryError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision(n => n + 1), []);
+  const [feed, setFeed] = useState(null);
+  const cache = useRef(null);
+  const [pageRequest, setPageRequest] = useState(null);
+  const key = JSON.stringify([term, video, type, status]);
+  const pages = pageRequest?.key === key ? pageRequest.pages : 1;
 
   useEffect(() => {
     if (!client) return;
-    let disposed = false;
-    let catalogTimer;
-    let catalogRequest = 0;
-
-    function refreshCatalog() {
-      const request = ++catalogRequest;
-      loadTikTokVideos(client).then(
-        results => {
-          if (!disposed && request === catalogRequest) {
-            setVideos(results);
-            setCatalogError(false);
-          }
-        },
-        () => { if (!disposed && request === catalogRequest) setCatalogError(true); },
-      );
+    let timer;
+    function scheduleRefresh() {
+      if (timer) return;
+      timer = setTimeout(() => { timer = null; refresh(); }, 250);
     }
-
-    refreshCatalog();
-    const channel = client.channel("link-inbox-new-comments").on("postgres_changes", {
-      event: "INSERT", schema: "public", table: "link_inbox_conversations",
-    }, ({ new: row }) => {
-      if (disposed || !row.tiktok_video_id) return;
-      const item = inboxItem(row, members);
-      setItems(previous => mergeConversations(previous, [item]).slice(0, inboxPageSize));
-      setVideoFeed(previous => previous?.id === row.tiktok_video_id
-        ? { ...previous, items: mergeConversations(previous.items, [item]) } : previous);
-      clearTimeout(catalogTimer);
-      catalogTimer = setTimeout(refreshCatalog, 200);
-    }).subscribe(status => {
-      if (disposed) return;
-      if (status !== "SUBSCRIBED") {
-        setConnection("offline");
-        return;
-      }
-      setConnection("live");
-      // Reconcile any inserts that arrived while the browser was disconnected.
-      setGeneration(value => value + 1);
-      refreshCatalog();
-      loadConversations(client, members).then(results => {
-        if (!disposed) setItems(previous => mergeConversations(previous, results).slice(0, inboxPageSize));
-      }).catch(() => {});
+    const channel = client.channel("link-inbox-conversations").on("postgres_changes", {
+      event: "*", schema: "public", table: "link_inbox_conversations",
+    }, scheduleRefresh).subscribe(state => {
+      setConnection(state === "SUBSCRIBED" ? "live" : "offline");
+      if (state === "SUBSCRIBED") scheduleRefresh();
     });
     return () => {
-      disposed = true;
-      clearTimeout(catalogTimer);
+      clearTimeout(timer);
       void client.removeChannel(channel);
     };
-  }, [client, members, setItems, setVideoFeed]);
+  }, [client, refresh]);
 
   useEffect(() => {
-    if (!client || !video) return;
-    let disposed = false;
-    loadConversations(client, members, { video }).then(
-      results => {
-        if (disposed) return;
-        setVideoFeed(previous => ({
-          id: video,
-          items: mergeConversations(previous?.id === video ? previous.items : [], results),
-          hasMore: previous?.id === video && previous.ready ? previous.hasMore : results.length === inboxPageSize,
-          ready: true,
-        }));
-      },
-      () => {
-        if (!disposed) setVideoFeed(previous => previous?.id === video ? { ...previous, error: true } : previous);
-      },
-    );
-    return () => { disposed = true; };
-  }, [client, members, video, generation, setVideoFeed]);
+    if (!client) return;
+    let cancelled = false;
+    Promise.allSettled([
+      client.rpc("link_inbox_counts").throwOnError(),
+      loadTikTokVideos(client),
+    ]).then(([totals, catalog]) => {
+      if (cancelled) return;
+      if (totals.status === "fulfilled") setCounts(totals.value.data);
+      if (catalog.status === "fulfilled") setVideos(catalog.value);
+      setSummaryError(totals.status === "rejected" || catalog.status === "rejected");
+    });
+    return () => { cancelled = true; };
+  }, [client, revision]);
 
-  return { videos, connection, catalogError, reloadVideo: () => setGeneration(value => value + 1) };
+  useEffect(() => {
+    if (!client) return;
+    const controller = new AbortController();
+    async function readPages() {
+      const last = cache.current;
+      const append = last?.key === key && last.revision === revision && last.pages + 1 === pages;
+      const items = append ? [...last.items] : [];
+      let count = append ? last.count : 0;
+      try {
+        for (let i = append ? last.pages : 0; i < pages; i++) {
+          const page = await loadConversations(client, members, {
+            term, video, type, status, before: items.at(-1), signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          if (i === 0) count = page.count;
+          items.push(...page.items);
+          if (!page.items.length || page.items.length >= page.count) break;
+        }
+        const result = { key, pages, revision, items, count };
+        cache.current = result;
+        setFeed(result);
+      } catch {
+        if (!controller.signal.aborted) {
+          setFeed({ ...(last?.key === key ? last : { key, items: [] }), error: true });
+        }
+      }
+    }
+    const timer = setTimeout(readPages, term ? 200 : 0);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [client, members, key, pages, revision, term, video, type, status]);
+
+  const visible = feed?.key === key ? feed : null;
+  return {
+    counts, videos, connection, summaryError, refresh,
+    updateItem(id, apply) {
+      setFeed(previous => previous && {
+        ...previous, items: previous.items.map(item => item.id === id ? apply(item) : item),
+      });
+      refresh();
+    },
+    items: visible?.items ?? [], count: visible?.count,
+    loading: !visible, error: visible?.error,
+    hasMore: visible && visible.items.length < visible.count,
+    loadingMore: visible && !visible.error && visible.pages < pages,
+    loadMore: () => setPageRequest({ key, pages: pages + 1 }),
+  };
 }
